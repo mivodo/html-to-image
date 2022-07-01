@@ -22,9 +22,6 @@ ADD ./ /usr/src/app
 WORKDIR /usr/src/app
 RUN cd /usr/src/app && npm install
 
-# Create output directory
-RUN mkdir -p /usr/src/app/out
-
 ENV PATH="/usr/src/app:${PATH}"
 
 EXPOSE 3033
