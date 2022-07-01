@@ -52,8 +52,8 @@ app.post('/', (req, res) => {
 		screenshot(req.body.html, tmpoutput.name, options).then(() => {
 			fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
 				tmpoutput.removeCallback();
-			});
-		});
+			})
+		}).catch(e => errorHandler(res, e));
 	} else {
 		const tmpinput = tmp.fileSync({ prefix: 'htmltoimage-', postfix: '.html' });
 		fs.writeFile(tmpinput.name, req.body.html, () => {
@@ -62,15 +62,20 @@ app.post('/', (req, res) => {
 					tmpinput.removeCallback();
 					tmpoutput.removeCallback();
 				});
-			});
+			}).catch(e => errorHandler(res, e));
 		});
 	}
 });
 
-// error handler (goes last in middleware stack)
+// error handler
+const errorHandler = (res, error) => {
+	res.status(error.status || 500).send({ error: error.message || "" });
+};
+
+// error handler middleware (goes last in stack)
 app.use((error, req, res, next) => {
 	if (error) {
-		res.status(error.status || 500).send({ error: error.message || "" });
+		errorHandler(res, error);
 	} else {
 		next();
 	}
