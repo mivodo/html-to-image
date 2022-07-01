@@ -39,23 +39,32 @@ app.use((req, res, next) => {
 
 // implement the endpoint
 app.post('/', (req, res) => {
-	const tmpinput = tmp.fileSync({ prefix: 'htmltoimage-', postfix: '.html' });
-	const tmpoutput = tmp.fileSync({ prefix: 'htmltoimage-' });
-
 	const options = req.body.options || {};
 	const format = supportedFormats[options.format] || supportedFormats.jpg; // default to JPG if not set
+	res.header("Content-Type", format.contentType);
 
 	options.screenshotArgs = Object.assign(options.screenshotArgs || {}, { type: format.screenshotTypeArg });
 
-	fs.writeFile(tmpinput.name, req.body.html, () => {
-		screenshot('file://' + tmpinput.name, tmpoutput.name, options).then(() => {
-			res.header("Content-Type", format.contentType);
+	let url;
+	const tmpoutput = tmp.fileSync({ prefix: 'htmltoimage-' });
+
+	if (isUrl(req.body.html)) {
+		screenshot(req.body.html, tmpoutput.name, options).then(() => {
 			fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
-				tmpinput.removeCallback();
 				tmpoutput.removeCallback();
 			});
 		});
-	});
+	} else {
+		const tmpinput = tmp.fileSync({ prefix: 'htmltoimage-', postfix: '.html' });
+		fs.writeFile(tmpinput.name, req.body.html, () => {
+			screenshot('file://' + tmpinput.name, tmpoutput.name, options).then(() => {
+				fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
+					tmpinput.removeCallback();
+					tmpoutput.removeCallback();
+				});
+			});
+		});
+	}
 });
 
 // error handler (goes last in middleware stack)
@@ -66,6 +75,16 @@ app.use((error, req, res, next) => {
 		next();
 	}
 });
+
+// helper function to check if string is a URL
+function isUrl(string) {
+	try {
+		const url = new URL(string);
+		return url.protocol === "http:" || url.protocol === "https:";
+	} catch (e) {
+		return false;
+	}
+}
 
 // the actual screenshot code, using puppeteer
 const screenshot = async (url, outputFile, options) => {

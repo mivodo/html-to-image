@@ -1,5 +1,5 @@
 # HTML-to-Image webservice
-Simple webservice to create screenshots/images of HTML ( [github](https://github.com/monkeyphysics/html-to-image), [docker](https://hub.docker.com/r/monkeyphysics/html-to-image) ).  
+Simple webservice to create screenshots/images of HTML: either using HTML or through a URL ( [github](https://github.com/monkeyphysics/html-to-image), [docker](https://hub.docker.com/r/monkeyphysics/html-to-image) ).  
 It can be run locally or as a container, and exposes a simple endpoint on your network on port `3033`.  
 Inspired by [nevermendel/chrome-headless-screenshots](https://github.com/NeverMendel/chrome-headless-screenshots).
 
@@ -35,7 +35,7 @@ You can also directly run [the app](https://github.com/monkeyphysics/html-to-ima
 ## API
 There is only one `POST` endpoint at the root of the webservice `/`.  
 The request should be of `Content-Type: application/json` where the request object has two properties:
-- `html` (**string**, _required_): the HTML
+- `html` (**string**, _required_): a URL or HTML as string
 - `options` (**object**, _optional_): configurable options
 
 ### Options
@@ -44,13 +44,25 @@ The request should be of `Content-Type: application/json` where the request obje
 - `options.format` (**string**, _optional_): one of `png`, `jpg`/`jpeg`, or `webp`
 - `options.screenshotArgs` (**object**, _optional_): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
 
-## Hello world
-Simple try the webservice with curl when running locally or with the container port exposed:
+## Examples
+Simple try the webservice with curl when running locally or with the container port exposed.
+
+### HTML: Hello world 
 ```
 curl \
     --header "Content-Type: application/json" \
     --request POST \
     --data '{ "html": "<h1>Hello</h1><h2>world</h2>" }' \
-    --output ~/test.jpg \
+    --output ~/helloworld.jpg \
+    http://localhost:3033/
+```
+
+### URL: Google
+```
+curl \
+    --header "Content-Type: application/json" \
+    --request POST \
+    --data '{ "html": "https://www.google.com", "width": 1024, "screenshotArgs": { "fullPage": true } }' \
+    --output ~/google.jpg \
     http://localhost:3033/
 ```
