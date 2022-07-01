@@ -45,7 +45,6 @@ app.post('/', (req, res) => {
 
 	options.screenshotArgs = Object.assign(options.screenshotArgs || {}, { type: format.screenshotTypeArg });
 
-	let url;
 	const tmpoutput = tmp.fileSync({ prefix: 'htmltoimage-' });
 
 	if (isUrl(req.body.html)) {
