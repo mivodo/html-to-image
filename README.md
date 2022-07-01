@@ -1,13 +1,14 @@
 # HTML-to-Image webservice
-Simple webservice to create screenshots/images of HTML: either using HTML or through a URL ( [github](https://github.com/monkeyphysics/html-to-image), [docker](https://hub.docker.com/r/monkeyphysics/html-to-image) ).  
-It can be run locally or as a container, and exposes a simple endpoint on your network on port `3033`.  
+Simple webservice to create screenshots/images of a webpage (URL or HTML-input).  
+The webservice can be run locally or as a container, and exposes a simple endpoint on your network on port `3033`.  
+Source availabe on [github](https://github.com/monkeyphysics/html-to-image) and container available on [docker](https://hub.docker.com/r/monkeyphysics/html-to-image).  
 Inspired by [nevermendel/chrome-headless-screenshots](https://github.com/NeverMendel/chrome-headless-screenshots).
 
-## Running the app
+## Running the service
 The container is available on docker-hub as [`monkeyphysics/html-to-image`](https://hub.docker.com/r/monkeyphysics/html-to-image).
 
 ### Docker-compose
-Simply add a service to your `docker-compose.yml`:
+Add the container as a service to your `docker-compose.yml`:
 ```
 htmltoimage:
     image: 'monkeyphysics/html-to-image'
@@ -24,7 +25,7 @@ htmltoimage:
 ```
 
 ### Docker run
-Run the service and cleanup after exposing `3033` locally as `3033`:
+Run the service and cleanup after (`--rm`) exposing port `3033` on your local machine:
 - `docker run --rm -p 3033:3033 monkeyphysics/html-to-image`
 
 ### Locally
@@ -33,19 +34,23 @@ You can also directly run [the app](https://github.com/monkeyphysics/html-to-ima
 - run the app with `node app.js`
 
 ## API
-There is only one `POST` endpoint at the root of the webservice `/`.  
-The request should be of `Content-Type: application/json` where the request object has two properties:
+### Request
+There is only one endpoint at the root of the webservice `/`. This endpoint only accepts `POST` requests.  
+The request should be of `Content-Type: application/json` (and use that header).  
+The request body (JSON-object) has two properties:
 - `html` (**string**, _required_): a URL or HTML as string
 - `options` (**object**, _optional_): configurable options
+  - `width` (**numeric**, _optional_): width of the browser window (screenshot)
+  - `height` (**numeric**, _optional_): height of the browser window (screenshot)
+  - `format` (**string**, _optional_): one of `png`, `jpg`/`jpeg`, or `webp`
+  - `screenshotArgs` (**object**, _optional_): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
 
-### Options
-- `options.width` (**numeric**, _optional_): width of the browser window (screenshot)
-- `options.height` (**numeric**, _optional_): height of the browser window (screenshot)
-- `options.format` (**string**, _optional_): one of `png`, `jpg`/`jpeg`, or `webp`
-- `options.screenshotArgs` (**object**, _optional_): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
+### Response
+The response body contains the image as binary data (http status code `200`).  
+When something goes wrong you should receive a JSON body describing the error (http status code `4xx` or `5xx`).
 
 ## Examples
-Simple try the webservice with curl when running locally or with the container port exposed.
+Simply test the webservice with curl when running locally or with the container port exposed.
 
 ### HTML: Hello world 
 ```
