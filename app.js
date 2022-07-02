@@ -34,6 +34,8 @@ app.use((req, res, next) => {
 		next({ status: 415, message: "Unexpected Content-Type: only supports 'application/json'" });
 	} else if (typeof req.body.html != 'string') {
 		next({ status: 400, message: "Missing 'html' property in request body, or 'html' property is not a string" });
+	} else if (req.body.html == '') {
+		next({ status: 400, message: "Property 'html' must not be empty" });
 	} else if (req.body.options && typeof req.body.options != 'object') {
 		next({ status: 400, message: "Property 'options' can only be an object (or omitted)" });
 	} else if (typeof req.body.format != 'string' || !supportedFormats[req.body.format]) {
