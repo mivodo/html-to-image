@@ -39,10 +39,10 @@ There is only one endpoint at the root of the webservice `/`. This endpoint only
 The request should be of `Content-Type: application/json` (and use that header).  
 The request body (JSON-object) has two properties:
 - `html` (**string**, _required_): a URL or HTML as string
+- `format` (**string**, _required_): one of `png`, `jpg`/`jpeg`, or `webp`
 - `options` (**object**, _optional_): configurable options
   - `width` (**numeric**, _optional_): width of the browser window (screenshot)
   - `height` (**numeric**, _optional_): height of the browser window (screenshot)
-  - `format` (**string**, _optional_): one of `png`, `jpg`/`jpeg`, or `webp`
   - `screenshotArgs` (**object**, _optional_): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
 
 ### Response

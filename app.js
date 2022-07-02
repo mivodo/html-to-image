@@ -36,6 +36,8 @@ app.use((req, res, next) => {
 		next({ status: 400, message: "Missing 'html' property in request body, or 'html' property is not a string" });
 	} else if (req.body.options && typeof req.body.options != 'object') {
 		next({ status: 400, message: "Property 'options' can only be an object (or omitted)" });
+	} else if (typeof req.body.format != 'string' || !supportedFormats[req.body.format]) {
+		next({ status: 400, message: `Property 'format' must be one of: ${Object.keys(supportedFormats).join(', ')}` });
 	} else {
 		next();
 	}
@@ -44,7 +46,8 @@ app.use((req, res, next) => {
 // implement the endpoint
 app.post('/', (req, res) => {
 	const options = req.body.options || {};
-	const format = supportedFormats[options.format] || supportedFormats.jpg; // default to JPG if not set
+	const format = supportedFormats[req.body.format]; // safe, validated in middleware
+
 	res.header("Content-Type", format.contentType);
 
 	options.screenshotArgs = Object.assign(options.screenshotArgs || {}, { type: format.screenshotTypeArg });
