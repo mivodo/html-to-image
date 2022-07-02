@@ -41,9 +41,9 @@ The request body (JSON-object) has two properties:
 - `html` (**string**, _required_): a URL or HTML as string
 - `format` (**string**, _required_): one of `png`, `jpg`/`jpeg`, or `webp`
 - `options` (**object**, _optional_): configurable options
-  - `width` (**numeric**, _optional_): width of the browser window (screenshot)
-  - `height` (**numeric**, _optional_): height of the browser window (screenshot)
-  - `screenshotArgs` (**object**, _optional_): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
+  - `width` (**numeric**, _optional_, defaults to `1920`): width of the browser window (screenshot)
+  - `height` (**numeric**, _optional_, defaults to `1080`): height of the browser window (screenshot)
+  - `screenshotArgs` (**object**, _optional_, defaults to `{}`): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
 
 ### Response
 The response body contains the image as binary data (http status code `200`).  
