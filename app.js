@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const tmp = require('tmp');
+const cors = require('cors');
 
 const app = express();
 const port = 3033;
@@ -18,6 +19,9 @@ const supportedFormats = {
 app.listen(port, () => {
 	console.log(`HTMLtoImage service listening on port ${port}`);
 });
+
+// cross-origin support
+app.use(cors())
 
 // parse JSON body for incoming request
 app.use(express.json());
