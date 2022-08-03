@@ -108,6 +108,7 @@ const screenshot = async (url, outputFile, options) => {
 		},
 		args: [
 			'--no-sandbox',
+			'--no-zygote',
 			'--headless',
 			'--disable-gpu',
 			'--disable-dev-shm-usage',
