@@ -15,13 +15,16 @@ const supportedFormats = {
 	'webp': { contentType: 'image/webp', screenshotTypeArg: 'webp' },
 };
 
+// disable maxEventListeners to allow multiple parallel requests
+process.setMaxListeners(0);
+
 // listen on our port
 app.listen(port, () => {
 	console.log(`HTMLtoImage service listening on port ${port}`);
 });
 
 // cross-origin support
-app.use(cors())
+app.use(cors());
 
 // parse JSON body for incoming request
 app.use(express.json());
@@ -90,14 +93,14 @@ app.use((error, req, res, next) => {
 });
 
 // helper function to check if string is a URL
-function isUrl(string) {
+const isUrl = (string) => {
 	try {
 		const url = new URL(string);
 		return url.protocol === "http:" || url.protocol === "https:";
 	} catch (e) {
 		return false;
 	}
-}
+};
 
 // the actual screenshot code, using puppeteer
 const screenshot = async (url, outputFile, options) => {
