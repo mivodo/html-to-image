@@ -15,9 +15,6 @@ const supportedFormats = {
 	'webp': { contentType: 'image/webp', screenshotTypeArg: 'webp' },
 };
 
-// disable maxEventListeners to allow multiple parallel requests
-process.setMaxListeners(0);
-
 // listen on our port
 app.listen(port, () => {
 	console.log(`HTMLtoImage service listening on port ${port}`);
@@ -117,11 +114,15 @@ const screenshot = async (url, outputFile, options) => {
 		],
 	});
 
-	const page = await browser.newPage();
-
-	await page.goto(url);
-	await page.screenshot(Object.assign({}, options.screenshotArgs, { path: outputFile }));
-	await browser.close();
+	try {
+		const page = await browser.newPage();
+		await page.goto(url);
+		await page.screenshot(Object.assign({}, options.screenshotArgs, { path: outputFile }));
+	} catch (e) {
+		throw e;
+	} finally {
+		await browser.close();
+	}
 }
 
 // correctly handle CTRL+C from cli when using 'docker run'
