@@ -107,11 +107,13 @@ const screenshot = async (url, outputFile, options) => {
 			height: options.height || 1080,
 		},
 		args: [
+			'--single-process',
 			'--no-sandbox',
 			'--no-zygote',
 			'--headless',
 			'--disable-gpu',
-			'--disable-dev-shm-usage',
+			// '--disable-setuid-sandbox',
+			// '--disable-dev-shm-usage',
 		],
 	});
 
