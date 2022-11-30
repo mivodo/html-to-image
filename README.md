@@ -1,5 +1,7 @@
 # HTML-to-Image webservice
-Simple webservice to create screenshots/images of a webpage (URL or HTML-input).  
+> 💡 **Now supports PDF**
+
+Simple webservice to create screenshots/images or pdf of a webpage (remote URL or manually provided HTML).  
 The webservice can be run locally or as a container, and exposes a simple endpoint on your network on port `3033`.  
 Source availabe on [github](https://github.com/monkeyphysics/html-to-image) and container available on [docker](https://hub.docker.com/r/monkeyphysics/html-to-image).  
 Inspired by [nevermendel/chrome-headless-screenshots](https://github.com/NeverMendel/chrome-headless-screenshots).
@@ -35,15 +37,20 @@ You can also directly run [the app](https://github.com/monkeyphysics/html-to-ima
 
 ## API
 ### Request
+> ⚠️ **Deprecated arguments**: `html` and `screenshotArgs` were renamed to `source` and `args`
+
 There is only one endpoint at the root of the webservice `/`. This endpoint only accepts `POST` requests.  
 The request should be of `Content-Type: application/json` (and use that header).  
 The request body (JSON-object) has both required and optional properties:
-- `html` (**string**, _required_): a URL or HTML as string
-- `format` (**string**, _required_): one of `png`, `jpg`/`jpeg`, or `webp`
+- `source` (**string**, _required_): URL or HTML
+- `format` (**string**, _required_): one of `png`, `jpg`/`jpeg`, `webp`, or `pdf`
 - `options` (**object**, _optional_): configurable options
   - `width` (**numeric**, _optional_, defaults to `1920`): width of the browser window (screenshot)
   - `height` (**numeric**, _optional_, defaults to `1080`): height of the browser window (screenshot)
-  - `screenshotArgs` (**object**, _optional_, defaults to `{}`): an object of options passed to [puppeteer.page.screenshot](https://pptr.dev/#?product=Puppeteer&show=api-pagescreenshotoptions)
+  - `args` (**object**, _optional_, defaults to `{}`): an object of options passed to [page.screenshot](https://pptr.dev/api/puppeteer.screenshotoptions/) or [page.pdf](https://pptr.dev/api/puppeteer.pdfoptions/) (be aware: some will be overwritten interally, like `path`, `format` or `type`)
+
+> 💡 `options.width` and `options.height` are redundant for PDFs, because the `options.args.format` (defaulting to `A4`) will override these
+
 
 ### Response
 The response body contains the image as binary data (http status code `200`) accompanied by the applicable `Content-Type`-header.  
@@ -57,7 +64,7 @@ Simply test the webservice with curl when running locally or with the container 
 curl \
     --header "Content-Type: application/json" \
     --request POST \
-    --data '{ "html": "<h1>Hello</h1><h2>world</h2>", "format": "jpg" }' \
+    --data '{ "source": "<h1>Hello</h1><h2>world</h2>", "format": "jpg" }' \
     --output ~/helloworld.jpg \
     http://localhost:3033/
 ```
@@ -67,7 +74,17 @@ curl \
 curl \
     --header "Content-Type: application/json" \
     --request POST \
-    --data '{ "html": "https://www.google.com", "format": "png", "options": { "width": 1024, "screenshotArgs": { "fullPage": true } } }' \
+    --data '{ "source": "https://www.google.com", "format": "png", "options": { "width": 1024, "args": { "fullPage": true } } }' \
     --output ~/google.jpg \
+    http://localhost:3033/
+```
+
+### PDF
+```
+curl \
+    --header "Content-Type: application/json" \
+    --request POST \
+    --data '{ "source": "https://pptr.dev/api/puppeteer.pdfoptions/", "format": "pdf" }' \
+    --output ~/pdfoptions.pdf \
     http://localhost:3033/
 ```

@@ -9,10 +9,11 @@ const app = express();
 const port = 3033;
 
 const supportedFormats = {
-	'png': { contentType: 'image/png', screenshotTypeArg: 'png' },
-	'jpg': { contentType: 'image/jpeg', screenshotTypeArg: 'jpeg' },
-	'jpeg': { contentType: 'image/jpeg', screenshotTypeArg: 'jpeg' },
-	'webp': { contentType: 'image/webp', screenshotTypeArg: 'webp' },
+	'png': { contentType: 'image/png', args: { type: 'png' } },
+	'jpg': { contentType: 'image/jpeg', args: { type: 'jpeg' } },
+	'jpeg': { contentType: 'image/jpeg', args: { type: 'jpeg' } },
+	'webp': { contentType: 'image/webp', args: { type: 'webp' } },
+	'pdf': { contentType: 'application/pdf' },
 };
 
 // listen on our port
@@ -32,10 +33,10 @@ app.use((req, res, next) => {
 		next({ status: 405, message: "Method not allowed" });
 	} else if (req.get('Content-Type') != 'application/json') {
 		next({ status: 415, message: "Unexpected Content-Type: only supports 'application/json'" });
-	} else if (typeof req.body.html != 'string') {
-		next({ status: 400, message: "Missing 'html' property in request body, or 'html' property is not a string" });
-	} else if (req.body.html == '') {
-		next({ status: 400, message: "Property 'html' must not be empty" });
+	} else if (typeof req.body.source != 'string') {
+		next({ status: 400, message: "Missing 'source' property in request body, or 'source' property is not a string" });
+	} else if (req.body.source == '') {
+		next({ status: 400, message: "Property 'source' must not be empty" });
 	} else if (req.body.options && typeof req.body.options != 'object') {
 		next({ status: 400, message: "Property 'options' can only be an object (or omitted)" });
 	} else if (typeof req.body.format != 'string' || !supportedFormats[req.body.format]) {
@@ -52,20 +53,21 @@ app.post('/', (req, res) => {
 
 	res.header("Content-Type", format.contentType);
 
-	options.screenshotArgs = Object.assign(options.screenshotArgs || {}, { type: format.screenshotTypeArg });
-
 	const tmpoutput = tmp.fileSync({ prefix: 'htmltoimage-' });
+	const isPdf = req.body.format == 'pdf';
 
-	if (isUrl(req.body.html)) {
-		screenshot(req.body.html, tmpoutput.name, options).then(() => {
+	options.args = Object.assign({}, options.args, format.args, { path: tmpoutput.name });
+
+	if (isUrl(req.body.source)) {
+		screenshot(req.body.source, isPdf, options).then(() => {
 			fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
 				tmpoutput.removeCallback();
 			})
 		}).catch(e => errorHandler(res, e));
 	} else {
 		const tmpinput = tmp.fileSync({ prefix: 'htmltoimage-', postfix: '.html' });
-		fs.writeFile(tmpinput.name, req.body.html, () => {
-			screenshot('file://' + tmpinput.name, tmpoutput.name, options).then(() => {
+		fs.writeFile(tmpinput.name, req.body.source, () => {
+			screenshot('file://' + tmpinput.name, isPdf, options).then(() => {
 				fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
 					tmpinput.removeCallback();
 					tmpoutput.removeCallback();
@@ -100,7 +102,7 @@ const isUrl = (string) => {
 };
 
 // the actual screenshot code, using puppeteer
-const screenshot = async (url, outputFile, options) => {
+const screenshot = async (url, isPdf, options) => {
 	const browser = await puppeteer.launch({
 		defaultViewport: {
 			width: options.width || 1920,
@@ -120,7 +122,13 @@ const screenshot = async (url, outputFile, options) => {
 	try {
 		const page = await browser.newPage();
 		await page.goto(url);
-		await page.screenshot(Object.assign({}, options.screenshotArgs, { path: outputFile }));
+
+		if (isPdf) {
+			// default to 'A4' (instead of 'letter'), but allow override through options.args
+			await page.pdf(Object.assign({ format: 'A4' }, options.args));
+		} else {
+			await page.screenshot(options.args);
+		}
 	} catch (e) {
 		throw e;
 	} finally {
