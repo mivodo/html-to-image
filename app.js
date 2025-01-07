@@ -25,7 +25,7 @@ app.listen(port, () => {
 app.use(cors());
 
 // parse JSON body for incoming request
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 
 // validate incoming request
 app.use((req, res, next) => {
