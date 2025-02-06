@@ -109,7 +109,6 @@ const screenshot = async (url, isPdf, options) => {
 			height: options.height || 1080,
 		},
 		args: [
-			'--single-process',
 			'--no-sandbox',
 			'--no-zygote',
 			'--headless',
