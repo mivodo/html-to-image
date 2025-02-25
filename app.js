@@ -147,5 +147,7 @@ const screenshot = async (url, isPdf, options) => {
 
 // correctly handle CTRL+C from cli when using 'docker run'
 process.on('SIGINT', function() {
+	console.log("Closing browser...");
+	browser.close();
     process.exit();
 });
