@@ -31,9 +31,15 @@ Run the service and cleanup after (`--rm`) exposing port `3033` on your local ma
 - `docker run --rm -p 3033:3033 monkeyphysics/html-to-image`
 
 ### Locally
+
+#### Local machine
 You can also directly run [the app](https://github.com/monkeyphysics/html-to-image) (not using a container). This requires you to have Chrome/Chromium installed locally.
 - make sure dependencies are installed `npm install` (only once, or after updating)
 - run the app with `node app.js`
+
+#### Docker
+The provided `docker-compose.yml` defines a `htmltoimage`-service that will run the webservice through docker compose:
+- `docker compose up`
 
 ## API
 ### Request

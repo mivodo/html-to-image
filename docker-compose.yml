@@ -1,0 +1,6 @@
+services:
+  htmltoimage:
+    build: .
+    container_name: htmltoimage
+    ports:
+      - "3033:3033"
