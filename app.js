@@ -1,9 +1,9 @@
-const puppeteer = require('puppeteer');
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-const tmp = require('tmp');
-const cors = require('cors');
+import puppeteer from 'puppeteer';
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import tmp from 'tmp';
+import cors from 'cors';
 
 const app = express();
 const port = 3033;
@@ -101,25 +101,33 @@ const isUrl = (string) => {
 	return false;
 };
 
+console.log(`Launching browser...`);
+const browser = await puppeteer.launch({
+	defaultViewport: {
+		width: 1920,
+		height: 1080,
+	},
+	args: [
+		'--no-sandbox',
+		'--no-zygote',
+		'--headless',
+		'--disable-gpu',
+		// '--disable-setuid-sandbox',
+		// '--disable-dev-shm-usage',
+	],
+});
+console.log(`... browser ready.`);
+
 // the actual screenshot code, using puppeteer
 const screenshot = async (url, isPdf, options) => {
-	const browser = await puppeteer.launch({
-		defaultViewport: {
-			width: options.width || 1920,
-			height: options.height || 1080,
-		},
-		args: [
-			'--no-sandbox',
-			'--no-zygote',
-			'--headless',
-			'--disable-gpu',
-			// '--disable-setuid-sandbox',
-			// '--disable-dev-shm-usage',
-		],
-	});
-
+	let page;
 	try {
-		const page = await browser.newPage();
+		page = await browser.newPage();
+		await page.setViewport({
+		  width: options.width || 1920,
+		  height: options.height || 1080,
+		});
+		
 		await page.goto(url);
 
 		if (isPdf) {
@@ -131,7 +139,9 @@ const screenshot = async (url, isPdf, options) => {
 	} catch (e) {
 		throw e;
 	} finally {
-		await browser.close();
+		if (page) {
+			await page.close();
+		}
 	}
 }
 
