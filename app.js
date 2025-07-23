@@ -144,30 +144,69 @@ const isUrl = (string) => {
 	return false;
 };
 
+const SCREENSHOT_TIMEOUT = parseInt(process.env.SCREENSHOT_TIMEOUT || '60000', 10); // 60 s default
+
 const screenshot = async (source, isPdf, options, sourceIsUrl) => {
   const page = await pagePool.acquire();
   try {
+    page.setDefaultTimeout(SCREENSHOT_TIMEOUT);
+    page.setDefaultNavigationTimeout(SCREENSHOT_TIMEOUT);
+
     await page.setViewport({
       width: options.width || 1920,
       height: options.height || 1080,
     });
 
     if (sourceIsUrl) {
-      await page.goto(source, { waitUntil: 'networkidle2', timeout: 30_000 });
+      await page.goto(source, { waitUntil: 'networkidle2', timeout: SCREENSHOT_TIMEOUT });
     } else {
       await page.setContent(source, { waitUntil: 'load' });
     }
 
     if (isPdf) {
-      // default to 'A4' (instead of 'letter'), but allow override through options.args
-      return await page.pdf(Object.assign({ format: 'A4' }, options.args));
-    } else {
-      return await page.screenshot(options.args);
+      return await page.pdf(Object.assign({ format: 'A4', timeout: SCREENSHOT_TIMEOUT }, options.args));
     }
+    return await page.screenshot(Object.assign({ timeout: SCREENSHOT_TIMEOUT }, options.args));
   } finally {
-    pagePool.release(page);
+    // Release the page back to the pool unless it crashed/closed.
+    if (!page.isClosed()) pagePool.release(page);
   }
 };
+
+let browser;
+let pagePool;
+
+const POOL_SIZE = parseInt(process.env.PAGE_POOL_SIZE || '4', 10);
+
+async function launchBrowser() {
+  console.log('Launching browser...');
+  browser = await puppeteer.launch({
+    defaultViewport: {
+      width: 1920,
+      height: 1080,
+    },
+    protocolTimeout: SCREENSHOT_TIMEOUT + 10000, // padding
+    args: [
+      '--no-sandbox',
+      '--no-zygote',
+      '--headless',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+    ],
+  });
+
+  pagePool = new PagePool(POOL_SIZE);
+  await pagePool.init(browser);
+  console.log(`... browser ready with ${POOL_SIZE} page(s) in pool.`);
+
+  browser.on('disconnected', async () => {
+    console.error('Browser disconnected/crashed – restarting');
+    try { await pagePool.destroy(); } catch (_) {}
+    await launchBrowser();
+  });
+}
+
+await launchBrowser();
 
 ['SIGINT', 'SIGTERM'].forEach(signal => {
   process.on(signal, async () => {
@@ -177,26 +216,3 @@ const screenshot = async (source, isPdf, options, sourceIsUrl) => {
     process.exit();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Launch browser and initialise page pool
-// ---------------------------------------------------------------------------
-console.log(`Launching browser...`);
-const browser = await puppeteer.launch({
-  defaultViewport: {
-    width: 1920,
-    height: 1080,
-  },
-  args: [
-    '--no-sandbox',
-    '--no-zygote',
-    '--headless',
-    '--disable-gpu',
-    '--disable-dev-shm-usage',
-  ],
-});
-
-const POOL_SIZE = parseInt(process.env.PAGE_POOL_SIZE || '4', 10);
-const pagePool = new PagePool(POOL_SIZE);
-await pagePool.init(browser);
-console.log(`... browser ready with ${POOL_SIZE} page(s) in pool.`);
