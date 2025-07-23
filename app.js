@@ -1,9 +1,46 @@
 import puppeteer from 'puppeteer';
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
-import tmp from 'tmp';
 import cors from 'cors';
+
+// ---------------------------------------------------------------------------
+// Page-pool helper – keeps a fixed number of pages alive and re-uses them.
+// ---------------------------------------------------------------------------
+class PagePool {
+  constructor(size) {
+    this.size = size;
+    this.available = [];
+    this.queue = [];
+  }
+
+  async init(browser) {
+    for (let i = 0; i < this.size; i++) {
+      const page = await browser.newPage();
+      this.available.push(page);
+    }
+  }
+
+  async acquire() {
+    if (this.available.length) {
+      return this.available.pop();
+    }
+    return new Promise(resolve => this.queue.push(resolve));
+  }
+
+  release(page) {
+    if (this.queue.length) {
+      const resolve = this.queue.shift();
+      resolve(page);
+    } else {
+      this.available.push(page);
+    }
+  }
+
+  async destroy() {
+    for (const page of this.available) {
+      try { await page.close(); } catch (_) {}
+    }
+  }
+}
 
 const app = express();
 const port = 3033;
@@ -47,34 +84,24 @@ app.use((req, res, next) => {
 });
 
 // implement the endpoint
-app.post('/', (req, res) => {
-	const options = req.body.options || {};
-	const format = supportedFormats[req.body.format]; // safe, validated in middleware
+app.post('/', async (req, res) => {
+  try {
+    const options = req.body.options || {};
+    const format = supportedFormats[req.body.format]; // validated by middleware
 
-	res.header("Content-Type", format.contentType);
+    res.type(format.contentType);
 
-	const tmpoutput = tmp.fileSync({ prefix: 'htmltoimage-' });
-	const isPdf = req.body.format == 'pdf';
+    // Merge requested screenshot args with format defaults – *without* a path.
+    options.args = Object.assign({}, options.args, format.args);
 
-	options.args = Object.assign({}, options.args, format.args, { path: tmpoutput.name });
+    const isPdf = req.body.format === 'pdf';
+    const source = req.body.source;
+    const buffer = await screenshot(source, isPdf, options, isUrl(source));
 
-	if (isUrl(req.body.source)) {
-		screenshot(req.body.source, isPdf, options).then(() => {
-			fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
-				tmpoutput.removeCallback();
-			})
-		}).catch(e => errorHandler(res, e));
-	} else {
-		const tmpinput = tmp.fileSync({ prefix: 'htmltoimage-', postfix: '.html' });
-		fs.writeFile(tmpinput.name, req.body.source, () => {
-			screenshot('file://' + tmpinput.name, isPdf, options).then(() => {
-				fs.createReadStream(tmpoutput.name).pipe(res).on('close', () => {
-					tmpinput.removeCallback();
-					tmpoutput.removeCallback();
-				});
-			}).catch(e => errorHandler(res, e));
-		});
-	}
+    res.send(buffer);
+  } catch (e) {
+    errorHandler(res, e);
+  }
 });
 
 // error handler
@@ -101,53 +128,59 @@ const isUrl = (string) => {
 	return false;
 };
 
+const screenshot = async (source, isPdf, options, sourceIsUrl) => {
+  const page = await pagePool.acquire();
+  try {
+    await page.setViewport({
+      width: options.width || 1920,
+      height: options.height || 1080,
+    });
+
+    if (sourceIsUrl) {
+      await page.goto(source, { waitUntil: 'networkidle2', timeout: 30_000 });
+    } else {
+      await page.setContent(source, { waitUntil: 'domcontentloaded' });
+    }
+
+    if (isPdf) {
+      // default to 'A4' (instead of 'letter'), but allow override through options.args
+      return await page.pdf(Object.assign({ format: 'A4' }, options.args));
+    } else {
+      return await page.screenshot(options.args);
+    }
+  } finally {
+    pagePool.release(page);
+  }
+};
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+  process.on(signal, async () => {
+    console.log('Closing browser...');
+    try { await pagePool.destroy(); } catch (_) {}
+    await browser.close();
+    process.exit();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Launch browser and initialise page pool
+// ---------------------------------------------------------------------------
 console.log(`Launching browser...`);
 const browser = await puppeteer.launch({
-	defaultViewport: {
-		width: 1920,
-		height: 1080,
-	},
-	args: [
-		'--no-sandbox',
-		'--no-zygote',
-		'--headless',
-		'--disable-gpu',
-		// '--disable-setuid-sandbox',
-		// '--disable-dev-shm-usage',
-	],
+  defaultViewport: {
+    width: 1920,
+    height: 1080,
+  },
+  args: [
+    '--no-sandbox',
+    '--no-zygote',
+    '--headless',
+    '--disable-gpu',
+    '--disable-dev-shm-usage',
+  ],
 });
-console.log(`... browser ready.`);
 
-// the actual screenshot code, using puppeteer
-const screenshot = async (url, isPdf, options) => {
-	let page;
-	try {
-		page = await browser.newPage();
-		await page.setViewport({
-		  width: options.width || 1920,
-		  height: options.height || 1080,
-		});
-		
-		await page.goto(url);
-
-		if (isPdf) {
-			// default to 'A4' (instead of 'letter'), but allow override through options.args
-			await page.pdf(Object.assign({ format: 'A4' }, options.args));
-		} else {
-			await page.screenshot(options.args);
-		}
-	} catch (e) {
-		throw e;
-	} finally {
-		if (page) {
-			await page.close();
-		}
-	}
-}
-
-// correctly handle CTRL+C from cli when using 'docker run'
-process.on('SIGINT', function() {
-	console.log("Closing browser...");
-	browser.close();
-    process.exit();
-});
+const POOL_SIZE = parseInt(process.env.PAGE_POOL_SIZE || '4', 10);
+const pagePool = new PagePool(POOL_SIZE);
+await pagePool.init(browser);
+console.log(`... browser ready with ${POOL_SIZE} page(s) in pool.`);
