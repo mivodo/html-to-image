@@ -107,7 +107,7 @@ app.post('/', async (req, res) => {
 
     const isPdf = req.body.format === 'pdf';
     const source = req.body.source;
-    const buffer = await screenshot(source, isPdf, options, isUrl(source));
+    const buffer = await screenshot(source, isPdf, options, isUrl(source), reqId);
 
     res.end(buffer);
     console.log(`[${reqId}] ✅ Converted to ${req.body.format} (${buffer.length} bytes) in ${Date.now() - start} ms`);
@@ -146,7 +146,24 @@ const isUrl = (string) => {
 
 const SCREENSHOT_TIMEOUT = parseInt(process.env.SCREENSHOT_TIMEOUT || '60000', 10); // 60 s default
 
-const screenshot = async (source, isPdf, options, sourceIsUrl) => {
+let restarting = false;
+
+async function restartBrowser(reason) {
+  if (restarting) return; // already restarting
+  restarting = true;
+  console.error(`Restarting browser: ${reason}`);
+  try {
+    if (browser) {
+      try { await pagePool.destroy(); } catch (_) {}
+      try { await browser.close(); } catch (_) {}
+    }
+  } finally {
+    await launchBrowser();
+    restarting = false;
+  }
+}
+
+const screenshot = async (source, isPdf, options, sourceIsUrl, reqId='n/a') => {
   const page = await pagePool.acquire();
   try {
     page.setDefaultTimeout(SCREENSHOT_TIMEOUT);
@@ -167,6 +184,14 @@ const screenshot = async (source, isPdf, options, sourceIsUrl) => {
       return await page.pdf(Object.assign({ format: 'A4', timeout: SCREENSHOT_TIMEOUT }, options.args));
     }
     return await page.screenshot(Object.assign({ timeout: SCREENSHOT_TIMEOUT }, options.args));
+  } catch (err) {
+    // Detect timeout or protocol errors indicating a hung browser and restart.
+    const timeoutLike = err instanceof puppeteer.errors.TimeoutError || /timed out/i.test(err.message);
+    if (timeoutLike) {
+      console.error(`[${reqId}] ⏱️  Screenshot timeout detected, forcing browser restart.`);
+      await restartBrowser('screenshot timeout');
+    }
+    throw err;
   } finally {
     // Release the page back to the pool unless it crashed/closed.
     if (!page.isClosed()) pagePool.release(page);
