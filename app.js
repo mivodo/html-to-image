@@ -155,7 +155,7 @@ const screenshot = async (source, isPdf, options, sourceIsUrl) => {
     if (sourceIsUrl) {
       await page.goto(source, { waitUntil: 'networkidle2', timeout: 30_000 });
     } else {
-      await page.setContent(source, { waitUntil: 'domcontentloaded' });
+      await page.setContent(source, { waitUntil: 'load' });
     }
 
     if (isPdf) {
