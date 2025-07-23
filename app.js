@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import express from 'express';
 import cors from 'cors';
+import crypto from 'crypto';
 
 // ---------------------------------------------------------------------------
 // Page-pool helper – keeps a fixed number of pages alive and re-uses them.
@@ -45,6 +46,14 @@ class PagePool {
 const app = express();
 const port = 3033;
 
+// ---------------------------------------------------------------------------
+// Generate a request ID for every incoming request so logs can be correlated.
+// ---------------------------------------------------------------------------
+app.use((req, res, next) => {
+  res.locals.reqId = crypto.randomUUID();
+  next();
+});
+
 const supportedFormats = {
 	'png': { contentType: 'image/png', args: { type: 'png' } },
 	'jpg': { contentType: 'image/jpeg', args: { type: 'jpeg' } },
@@ -62,7 +71,7 @@ app.listen(port, () => {
 app.use(cors());
 
 // parse JSON body for incoming request
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // validate incoming request
 app.use((req, res, next) => {
@@ -85,6 +94,8 @@ app.use((req, res, next) => {
 
 // implement the endpoint
 app.post('/', async (req, res) => {
+  const reqId = res.locals.reqId;
+  const start = Date.now();
   try {
     const options = req.body.options || {};
     const format = supportedFormats[req.body.format]; // validated by middleware
@@ -98,15 +109,20 @@ app.post('/', async (req, res) => {
     const source = req.body.source;
     const buffer = await screenshot(source, isPdf, options, isUrl(source));
 
-    res.send(buffer);
+    res.end(buffer);
+    console.log(`[${reqId}] ✅ Converted to ${req.body.format} (${buffer.length} bytes) in ${Date.now() - start} ms`);
   } catch (e) {
+    console.error(`[${reqId}] ❌ Conversion failed:`, e);
     errorHandler(res, e);
   }
 });
 
 // error handler
 const errorHandler = (res, error) => {
-	res.status(error.status || 500).send({ error: error.message || "" });
+  // Attach requestId if available
+  const stamp = res?.locals?.reqId ? `[${res.locals.reqId}] ` : '';
+  console.error(`${stamp}ErrorHandler:`, error);
+  res.status(error.status || 500).send({ error: error.message || "" });
 };
 
 // error handler middleware (goes last in stack)
