@@ -210,7 +210,7 @@ async function launchBrowser() {
       width: 1920,
       height: 1080,
     },
-    protocolTimeout: SCREENSHOT_TIMEOUT + 10000, // padding
+    protocolTimeout: parseInt(process.env.PROTOCOL_TIMEOUT || '60000', 10), // padding
     args: [
       '--no-sandbox',
       '--no-zygote',
