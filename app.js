@@ -146,6 +146,15 @@ const isUrl = (string) => {
 
 const SCREENSHOT_TIMEOUT = parseInt(process.env.SCREENSHOT_TIMEOUT || '60000', 10); // 60 s default
 
+// helper to enforce timeout on operations that don't respect Puppeteer's default timeout
+const withTimeout = (promise, ms, errMsg) => {
+  let id;
+  const timeout = new Promise((_, reject) => {
+    id = setTimeout(() => reject(new Error(errMsg)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(id));
+};
+
 let restarting = false;
 
 async function restartBrowser(reason) {
@@ -180,13 +189,16 @@ const screenshot = async (source, isPdf, options, sourceIsUrl, reqId='n/a') => {
       await page.setContent(source, { waitUntil: 'load' });
     }
 
-    if (isPdf) {
-      return await page.pdf(Object.assign({ format: 'A4', timeout: SCREENSHOT_TIMEOUT }, options.args));
-    }
-    return await page.screenshot(Object.assign({ timeout: SCREENSHOT_TIMEOUT }, options.args));
+    // PDF or PNG capture with explicit timeout guard because Puppeteer does not honour defaults here.
+    const capturePromise = isPdf
+      ? page.pdf(Object.assign({ format: 'A4' }, options.args))
+      : page.screenshot(options.args);
+
+    return await withTimeout(capturePromise, SCREENSHOT_TIMEOUT, 'captureTimeout');
+
   } catch (err) {
     // Detect timeout or protocol errors indicating a hung browser and restart.
-    const timeoutLike = err instanceof puppeteer.errors.TimeoutError || /timed out/i.test(err.message);
+    const timeoutLike = err.name === 'TimeoutError' || /timed out|captureTimeout/i.test(err.message);
     if (timeoutLike) {
       console.error(`[${reqId}] ⏱️  Screenshot timeout detected, forcing browser restart.`);
       await restartBrowser('screenshot timeout');
